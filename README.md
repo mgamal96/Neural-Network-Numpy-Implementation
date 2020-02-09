@@ -1,5 +1,5 @@
 # Neural-Network-Numpy-Implementation
-Complete Implementation of MLP Neural Network from scratch. Below are the derviations for the vectorized implementation.
+MLP Neural Network Implementation using only NumPy. The derviations below are used to obtain a vectorized result.
 
 
 <table style="width:100%">
