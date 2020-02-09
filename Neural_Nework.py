@@ -1,16 +1,18 @@
 
+import numpy as np
+
 class MLP_Neural_Network:
     def __init__(self, dims):
         """ Neural Network with integrated optimizer (grad descent with momentum).
-        Eg. 
+        Eg.
         1. nn = MLP_Neural_Network(dims)
         2. nn.forward(x)
         3. nn.backward()
         4. nn.update_weights(gamma=0.9, alpha=10E-5)
         """
 
-        self.W = self.xavierWeights(d)
-        self.B = self.initBias(d)
+        self.W = self.xavierWeights(dims)
+        self.B = self.initBias(dims)
 
         self.Vw = []
         self.Vb = []
@@ -62,23 +64,20 @@ class MLP_Neural_Network:
             D: (list of np.array) backward messages, Shape: [[N, d(0)] ...[N, d(L)]]
         """
 
-        # W = self.W
-        # S = self.S
 
-        L = len(W)
-        D = [None]*L
+        L = len(self.W)     # number of layers
+        n = len(Y)          # number of training points
 
-        n = len(Y) # number of training points
+        self.D = [None]*L
+
 
         # first delta_L
-        D[L-1] = gradCE(Y, np.copy(self.S[L-1]))
+        self.D[L-1] = self.gradCE(Y, np.copy(self.S[L-1]))
 
         # backwards chain to calculate Deltas
         for l in range(L-2, -1, -1):
             grad_relu_sl = self.gradRelU(np.copy(self.S[l]))
-            D[l] = (np.multiply( grad_relu_sl.transpose() , np.matmul(self.W[l+1], self.D[l+1].transpose()))).transpose()
-
-        self.D = D
+            self.D[l] = (np.multiply( grad_relu_sl.transpose() , np.matmul(self.W[l+1], self.D[l+1].transpose()))).transpose()
 
     """ Helper Functions """
     def compute(self, x_prev, w, b):
@@ -128,7 +127,6 @@ class MLP_Neural_Network:
         Args:
             Y: (np.array) labels, Shape: [N, d(L)]
             sL: (np.array) pre-activations at layer L, Shape: [N, d(L)]
-
         Returns:
             delta_L: (np.array) backward message at layer L, Shape: [N, d(L)]
         """
@@ -148,7 +146,7 @@ class MLP_Neural_Network:
 
         logical = sl > 0
         dsigma = logical*1
-        return dsimga
+        return dsigma
 
     def xavierWeights(self, d):
         """ Xavier initialization, for ReLU
@@ -167,7 +165,7 @@ class MLP_Neural_Network:
 
         return W
 
-    def initBias(d):
+    def initBias(self, d):
         """ Initializes biases to zero, given nueral network archtiecture d.
         Args:
             d: (python list) list of layer dimnesions, Shape: [d(0), .. d(l) ..., d(L)]
@@ -231,100 +229,55 @@ class MLP_Neural_Network:
 
     def update_weights(self, gamma=0.9, alpha=10E-5):
         """ Compute Gradients and update weights
-        """
-        compute_grads()
-        grad_descent_step(gamma = gamma, alpha = alpha)
-
-
-
-class GradDescent:
-    def __init__(self):
-        pass
-
-    def compute(self, W, B, X, D):
-        """ Computes gradients with respect to all weights and biases. dE/dw = matmul(X.T^(l), D^(l))
-        Args:
-            W: (list of np.array) Weights at each layer, Shape: [ [d(0), d(1)] ... [d(L-1), d(L)] ]
-            B: (list of np.array) Bias at each layer, Shape: [ [d(0), 1] ... [d(L), 1] ]
-            X: (list of np.array) post-activation outputs, Shape: [ [d(0), 1] ... [d(L), 1] ]
-            D: (list of np.array) Backward Messages, Shape: [ [d(0), 1] ... [d(L), 1] ]
-        Returns:
-            DW: (list of np.array) Derivatves with respect to Weights, Shape: [ [d(0), d(1)] ... [d(L-1), d(L)] ]
-            DB: (list of np.array) Derivatves with respect to Biases, Shape: [ [d(0), 1] ... [d(L), 1] ]
-        """
-
-
-        DW = []
-        DB = []
-
-        for l in range(len(W)):
-            # len(X) = len(W)+1     ==>    X[l] is X(l-1)
-            # len(D) = len(W)       ==>    D[l] is D(l)
-
-            N, K = D[l].shape
-            dw = (1/N) * np.matmul(X[l].transpose(), D[l])
-            db = (1/N) * np.expand_dims(D[l].sum(axis=0), 1)
-
-            DW.append(dw)
-            DB.append(db)
-
-        self.DW, self.DB = DW, DB
-
-    def compute_and_step(self, gamma = 0.9, alpha = 10E-5):
-        """ Gradient Descent with momentum. Computes gradients and updates weights and biases
         Args:
             gamma: (float) Hyper-parameter
             alpha: (float) Hyper-parameter
         """
+        self.compute_grads()
+        self.grad_descent_step(gamma = gamma, alpha = alpha)
 
-        self.compute()
-        W, B, DW, DB, Vw, Vb = self.W, self.B, self.DW, self.DB, self.Vw, self.Vb
+class Evaluation_Metrics:
+    """ Contains the following funcitons for direct use
+        1. Mean Squared Error Loss Function
+        2. Multi Class Classification Accuracy Function
+    """
 
+    def Cross_Entropy_Loss(self, X, Y, reduction='mean'):
+        """ Cross Entropy Loss, reduction
+        Args:
+            X: (np.array) Predictions, Shape: [batch_size, ...]
+            Y: (np.array) Ground truth, Shape: [batch_size, ...]
+            reduction: (string) can reduce with 'sum' or 'mean'
+        Returns:
+            loss: (float) averaged to summed loss
+        """
 
-        for i in range(len(W)):
+        N, K = X.shape
 
-            Vw[i] = gamma* Vw[i] + alpha * DW[i]
-            Vb[i] = gamma* Vb[i] + alpha * DB[i]
+        X = X.astype(np.float64)
+        Y = Y.astype(np.float64)
 
+        # Prevent log(0)
+        X = X + 1e-2
+        loss = - (1/N) * np.sum(np.sum(np.multiply(Y, np.log(X)), axis=1))
 
-            W[i] = W[i] - Vw[i]
-            B[i] = B[i] - Vb[i]
+        if(reduction == 'sum'):
+            loss = loss * N
 
-        # Update weights and velocities
-        self.W, self.B, self.Vw, self.Vb = W, B, Vw, Vb
+        return loss
 
+    def Multi_Class_Classificiton_Accuracy(self, X, Y):
+        """ Number of correct predictions divided by total number of predicions
+        Args:
+            X: (np.array) Predictions, Shape: [batch_size, K]
+            Y: (np.array) Ground truth, Shape: [batch_size, K]
+        Returns:
+            acc: (float) Percentage of correct Predicitons
+        """
+        pred = np.argmax(X, axis=1)
+        target = np.argmax(Y, axis=1)
 
-""" Gradient Descent with momentum.
-Args:
-    W: (list of np.array) Weights at each layer, Shape: [[d(0), d(1)] ... [d(L-1), d(L)] ]
-    B: (list of np.array) Biases at each layer, Shape: [ [d(0), 1] ... [d(L), 1] ]
-    DW: (list of np.array) Derivatves with respect to Weights, Shape: [ [d(0), d(1)] ... [d(L-1), d(L)] ]
-    DB: (list of np.array) Derivatves with respect to Biases, Shape: [ [d(0), 1] ... [d(L), 1] ]
-    Vw: (list of np.array) Weight Velocity at each layer, Shape: [[d(0), d(1)] ... [d(L-1), d(L)] ]
-    Vb: (list of np.array) Bias Velocity at each layer, Shape: [ [d(0), 1] ... [d(L), 1] ]
-    gamma: (float) Hyper-parameter
-    alpha: (float) Hyper-parameter
-Returns:
-    W: (list of np.array) Updated Weights, Shape: [[d(0), d(1)] ... [d(L-1), d(L)] ]
-    B: (list of np.array) Updated Biases, Shape: [ [d(0), 1] ... [d(L), 1] ]
-    Vw: (list of np.array) Updated Weight Velocity, Shape: [[d(0), d(1)] ... [d(L-1), d(L)] ]
-    Vb: (list of np.array) Updated Bias Velocity, Shape: [ [d(0), 1] ... [d(L), 1] ]
-"""
+        corr = pred==target
+        acc = corr.sum()/len(pred)
 
-
-""" Computes gradients with respect to all weights and biases. dE/dw = matmul(X.T^(l), D^(l))
-Args:
-    W: (list of np.array) Weights at each layer, Shape: [ [d(0), d(1)] ... [d(L-1), d(L)] ]
-    B: (list of np.array) Bias at each layer, Shape: [ [d(0), 1] ... [d(L), 1] ]
-    X: (list of np.array) post-activation outputs, Shape: [ [d(0), 1] ... [d(L), 1] ]
-    D: (list of np.array) Backward Messages, Shape: [ [d(0), 1] ... [d(L), 1] ]
-Returns:
-    DW: (list of np.array) Derivatves with respect to Weights, Shape: [ [d(0), d(1)] ... [d(L-1), d(L)] ]
-    DB: (list of np.array) Derivatves with respect to Biases, Shape: [ [d(0), 1] ... [d(L), 1] ]
-"""
-
-"""
-Carry out a forward pass. Notation:
-X: The complete Neural Network List of X's which are N x d(l) output matrices at a given layer l
-W: The complete Neural Network List of W's which are d(l-1) x d(l) matrices at a given layer l
-B: The complete Neural Network List of B's which are 1 x d(l) matrices at a given layer l"""
+        return acc
